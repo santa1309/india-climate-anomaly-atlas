@@ -1,0 +1,15 @@
+# Runtime / build logs
+generation_run.log
+*.log
+
+# Python caches
+__pycache__/
+*.pyc
+
+# Editor / tooling
+.claude/
+.vscode/
+.DS_Store
+
+# Intermediate artifacts written during geometry export
+data/temp_districts.geojson

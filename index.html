@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>India Climate Anomaly Atlas</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400;1,9..144,600&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-bg"></div>
+  <div class="header-inner">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 40 40" width="34" height="34">
+          <defs>
+            <linearGradient id="bm-grad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#60b1f4"/>
+              <stop offset="100%" stop-color="#ff6b3d"/>
+            </linearGradient>
+          </defs>
+          <circle cx="20" cy="20" r="18" fill="none" stroke="url(#bm-grad)" stroke-width="2"/>
+          <path d="M8 22 Q14 14, 20 22 T32 22" fill="none" stroke="url(#bm-grad)" stroke-width="2" stroke-linecap="round"/>
+          <path d="M8 28 Q14 20, 20 28 T32 28" fill="none" stroke="url(#bm-grad)" stroke-width="2" stroke-linecap="round" opacity="0.55"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <p class="kicker-top">An open climate atlas · India</p>
+        <h1>The <em>Anomaly</em> Atlas</h1>
+      </div>
+    </div>
+    <div class="header-meta" id="metaInfo">
+      <span class="meta-pulse"></span>
+      <div>
+        <span class="meta-label">Latest published</span>
+        <span class="meta-value" id="metaCurrentWeek">—</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section class="control-strip">
+  <div class="control-cluster">
+    <div class="cluster-label">When</div>
+    <div class="control-group">
+      <label for="yearSelect">Year</label>
+      <select id="yearSelect" class="select"></select>
+    </div>
+    <div class="control-group">
+      <label for="monthSelect">Month</label>
+      <select id="monthSelect" class="select"></select>
+    </div>
+    <div class="control-group">
+      <label for="weekSelect">Week</label>
+      <select id="weekSelect" class="select"></select>
+    </div>
+  </div>
+
+  <div class="control-divider" aria-hidden="true"></div>
+
+  <div class="control-cluster">
+    <div class="cluster-label">Where</div>
+    <div class="control-group">
+      <label for="stateSelect">State</label>
+      <select id="stateSelect" class="select"></select>
+    </div>
+    <div class="control-group">
+      <label for="districtSelect">District</label>
+      <select id="districtSelect" class="select select-wide"></select>
+    </div>
+  </div>
+
+  <div class="control-spacer"></div>
+
+  <div class="date-range" id="dateRangeDisplay">
+    <span class="date-range-label">Reporting period</span>
+    <span class="date-range-value" id="dateRangeValue">—</span>
+  </div>
+</section>
+
+<main class="dashboard">
+  <section class="map-pane">
+
+    <nav class="map-tabs" role="tablist" aria-label="Climate variable">
+      <button class="mtab is-active" role="tab" aria-selected="true" data-var="rainfall" title="Rainfall Deviation">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M6 13a4.5 4.5 0 014-4.5h3a4 4 0 010 8H10z"/>
+          <line x1="8" y1="19" x2="8" y2="21.5"/>
+          <line x1="12" y1="19.5" x2="12" y2="22"/>
+          <line x1="16" y1="19" x2="16" y2="21.5"/>
+        </svg>
+        <span class="mtab-label">Rainfall</span>
+      </button>
+      <button class="mtab" role="tab" aria-selected="false" data-var="tmax" title="Maximum Temperature Anomaly">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M14 14V5a2 2 0 10-4 0v9a4 4 0 104 0z"/>
+          <line x1="16" y1="6" x2="20" y2="6"/>
+          <line x1="16" y1="9" x2="19" y2="9"/>
+          <line x1="16" y1="12" x2="19" y2="12"/>
+        </svg>
+        <span class="mtab-label">Max Temp</span>
+      </button>
+      <button class="mtab" role="tab" aria-selected="false" data-var="tmin" title="Minimum Temperature Anomaly">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M14 14V5a2 2 0 10-4 0v9a4 4 0 104 0z"/>
+          <path d="M19.5 17 L21.5 19 L19.5 21" />
+          <line x1="16" y1="19" x2="21" y2="19"/>
+        </svg>
+        <span class="mtab-label">Min Temp</span>
+      </button>
+    </nav>
+
+    <div id="map"></div>
+
+    <div class="map-overlay-tip" id="mapHint">
+      <span class="dot" id="hintSurplusDot"></span> <span id="hintSurplusLbl">Surplus</span> &nbsp;·&nbsp;
+      <span class="dot" id="hintDeficitDot"></span> <span id="hintDeficitLbl">Deficit</span> &nbsp;·&nbsp;
+      Hover for values, click to lock
+    </div>
+  </section>
+
+  <aside class="side-pane">
+
+    <section class="hero-stats">
+      <div class="hero-card hero-surplus">
+        <div class="hero-glyph">▲</div>
+        <div class="hero-body">
+          <div class="hero-label" id="heroSurplusLabel">Surplus</div>
+          <div class="hero-value-row">
+            <span class="hero-value" id="heroSurplus">—</span>
+            <span class="hero-pct" id="heroSurplusPct">—</span>
+          </div>
+          <div class="hero-unit" id="heroSurplusUnit">excess districts</div>
+        </div>
+      </div>
+      <div class="hero-card hero-deficit">
+        <div class="hero-glyph">▼</div>
+        <div class="hero-body">
+          <div class="hero-label" id="heroDeficitLabel">Deficit</div>
+          <div class="hero-value-row">
+            <span class="hero-value" id="heroDeficit">—</span>
+            <span class="hero-pct" id="heroDeficitPct">—</span>
+          </div>
+          <div class="hero-unit" id="heroDeficitUnit">deficient + scanty + no-rain</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card summary-card">
+      <header class="card-header">
+        <h2>Distribution this week</h2>
+        <span class="card-sub" id="summaryCount">—</span>
+      </header>
+      <div class="summary-bar" id="summaryBar"></div>
+      <ul class="summary-legend" id="summaryLegend"></ul>
+    </section>
+
+    <section class="card detail-card" id="detailCard">
+      <header class="card-header">
+        <h2 id="detailTitle">Select a district</h2>
+        <span class="card-sub" id="detailSub">Click the map or use the search above</span>
+      </header>
+
+      <div class="detail-body" id="detailBody" hidden>
+        <div class="detail-grid">
+          <div class="metric">
+            <span class="metric-label">Actual</span>
+            <span class="metric-value" id="metActual">—</span>
+            <span class="metric-unit" id="metActualUnit">mm</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Normal</span>
+            <span class="metric-value" id="metNormal">—</span>
+            <span class="metric-unit" id="metNormalUnit">mm</span>
+          </div>
+          <div class="metric metric-emph">
+            <span class="metric-label" id="metMeasureLabel">Deviation</span>
+            <span class="metric-value" id="metDeviation">—</span>
+            <span class="metric-unit" id="metMeasureUnit">%</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Category</span>
+            <span class="metric-pill" id="metCategory">—</span>
+          </div>
+        </div>
+
+        <div class="chart-block">
+          <div class="chart-block-head">
+            <h3>Weekly trajectory <span class="chart-year" id="chartYear">—</span></h3>
+            <div class="chart-block-legend">
+              <span class="cl-item"><span class="cl-swatch cl-actual"></span>Actual</span>
+              <span class="cl-item"><span class="cl-swatch cl-normal"></span>Normal</span>
+            </div>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="trendChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+  </aside>
+</main>
+
+<footer class="legend-bar" id="legendBar">
+  <div class="legend-title" id="legendTitle">Rainfall Departure Classes</div>
+</footer>
+<div class="normal-note" id="normalNote">Normal Rainfall Considered from 1961-2010</div>
+
+<div class="loading-screen" id="loadingScreen">
+  <div class="loader">
+    <div class="loader-pulse"></div>
+    <div class="loader-text">Loading climate data…</div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
