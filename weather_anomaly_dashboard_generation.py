@@ -331,10 +331,13 @@ def process_temperature_week(year, month, week_num, week_start, week_end,
         with open(week_file, encoding="utf-8") as f:
             rec = json.load(f)
         sample = next(iter(rec.get("districts", {}).values()), {})
-        # Current schema has tmax_*/tmin_* keys
-        if "tmax_actual" in sample or "tmin_actual" in sample:
+        # Only treat a week as done when BOTH tmax_* and tmin_* are present.
+        # A partial file (e.g. tmax source unavailable when first generated)
+        # must be re-processed so the missing variable gets backfilled.
+        if "tmax_actual" in sample and "tmin_actual" in sample:
             return rec
-        print(f"  temperature {week_key}: outdated schema → re-processing")
+        missing = "tmax" if "tmax_actual" not in sample else "tmin"
+        print(f"  temperature {week_key}: incomplete (missing {missing}) → re-processing")
 
     print(f"  temperature {week_key}  [{week_start} → {week_end}]")
 
