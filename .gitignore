@@ -13,3 +13,8 @@ __pycache__/
 
 # Intermediate artifacts written during geometry export
 data/temp_districts.geojson
+
+# Offline standalone build (~64 MB, regenerable, NOT served by Pages).
+# Kept out of git so the weekly data push never hits GitHub's 100 MB limit.
+# Build it locally with: python update_atlas.py --build
+dashboard_standalone.html

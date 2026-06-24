@@ -2,22 +2,27 @@
 """
 One-shot updater for the India Climate Anomaly Atlas.
 =====================================================
-Runs the full "reproduce a future update" pipeline from PROCESS.md:
-
-  1. Generate any newly-completed weeks   (weather_anomaly_dashboard_generation.py)
-  2. Rebuild the offline standalone HTML   (build_standalone_dashboard.py)
-  3. git add -A + commit (only if something changed)
-  4. git push origin main
-  5. Poll the live GitHub Pages manifest until it serves the new data
-
-Run it whenever you want to refresh the published dashboard:
+Refreshes the *published* dashboard data and deploys it to GitHub Pages.
+This is the only file you need to run:
 
     python update_atlas.py
 
+What it does:
+
+  1. Generate any newly-completed weeks   (weather_anomaly_dashboard_generation.py)
+  2. git add -A + commit                   (only if something changed)
+  3. git push origin main
+  4. Poll the live GitHub Pages manifest until it serves the new data
+
+The big offline build `dashboard_standalone.html` (~64 MB) is *gitignored* and
+NOT committed -- it is a local-only artifact and is not served by Pages, so
+keeping it out of git stops the weekly push from ever hitting GitHub's 100 MB
+per-file limit. Pass --build if you also want a fresh local copy of it.
+
 Useful flags:
-    --no-push      do everything except commit & push (local dry run)
+    --build        also rebuild the local offline dashboard_standalone.html
+    --no-push      generate locally but do not commit or push (dry run)
     --no-verify    skip the live-deployment poll at the end
-    --no-build     skip rebuilding the 61 MB standalone HTML
 """
 
 import argparse
@@ -35,7 +40,7 @@ HERE = Path(__file__).resolve().parent
 
 # The `spi` conda env is the only one with the full working stack
 # (imdlib / geopandas / exactextract / rioxarray). WEATHER_ANALYSIS is broken
-# by the NumPy 2.0 / dask `np.round_` removal — do NOT use it.
+# by the NumPy 2.0 / dask `np.round_` removal -- do NOT use it.
 SPI_PYTHON = Path(os.environ.get(
     "SPI_PYTHON", r"C:/ProgramData/anaconda3/envs/spi/python.exe"
 ))
@@ -126,10 +131,11 @@ def verify_live(expected_week: str) -> bool:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Update & deploy the Climate Atlas.")
+    parser.add_argument("--build", action="store_true",
+                        help="also rebuild the local offline dashboard_standalone.html "
+                             "(gitignored; not committed)")
     parser.add_argument("--no-push", action="store_true",
-                        help="generate/build locally but do not commit or push")
-    parser.add_argument("--no-build", action="store_true",
-                        help="skip rebuilding the standalone HTML")
+                        help="generate locally but do not commit or push")
     parser.add_argument("--no-verify", action="store_true",
                         help="skip polling the live deployment")
     args = parser.parse_args()
@@ -138,7 +144,8 @@ def main() -> None:
     if not SPI_PYTHON.exists():
         sys.exit(f"[update_atlas] spi python not found: {SPI_PYTHON}\n"
                  f"Set the SPI_PYTHON env var to the correct interpreter.")
-    for script in (GEN_SCRIPT, BUILD_SCRIPT):
+    needed = [GEN_SCRIPT] + ([BUILD_SCRIPT] if args.build else [])
+    for script in needed:
         if not script.exists():
             sys.exit(f"[update_atlas] missing script: {script}")
 
@@ -146,46 +153,41 @@ def main() -> None:
     before = latest_local_week()
     log(f"latest local week before run: {before}")
 
-    # 1. Generate new weeks (idempotent — only adds weeks where week_end < today)
-    log("STEP 1/5  generating new weeks ...")
+    # 1. Generate new weeks (idempotent -- only adds weeks where week_end < today)
+    log("STEP 1/4  generating new weeks ...")
     run([str(SPI_PYTHON), str(GEN_SCRIPT)], env=env)
 
     after = latest_local_week()
     log(f"latest local week after run:  {after}")
-    if after == before and not git_has_changes():
-        log("No new data and no changes — already up to date. Nothing to deploy.")
-        return
 
-    # 2. Rebuild the offline standalone dashboard
-    if args.no_build:
-        log("STEP 2/5  skipped (--no-build)")
-    else:
-        log("STEP 2/5  rebuilding standalone HTML ...")
+    # Optional: refresh the local offline build (never committed -- gitignored)
+    if args.build:
+        log("        rebuilding local standalone HTML (--build) ...")
         run([str(SPI_PYTHON), str(BUILD_SCRIPT)], env=env)
 
-    if args.no_push:
-        log("STEP 3-5 skipped (--no-push). Local files are updated.")
-        return
-
     if not git_has_changes():
-        log("Nothing to commit after build — skipping push.")
+        log("No changes to commit -- already up to date. Nothing to deploy.")
         return
 
-    # 3. Commit
+    if args.no_push:
+        log("STEP 2-4 skipped (--no-push). Local files are updated.")
+        return
+
+    # 2. Commit
     commit_msg = f"India Climate Anomaly Atlas: data through {after}"
-    log(f"STEP 3/5  committing: {commit_msg!r}")
+    log(f"STEP 2/4  committing: {commit_msg!r}")
     run(["git", "add", "-A"])
     run(["git", "commit", "-m", commit_msg])
 
-    # 4. Push
-    log("STEP 4/5  pushing to GitHub ...")
+    # 3. Push
+    log("STEP 3/4  pushing to GitHub ...")
     run(["git", "push", GIT_REMOTE, GIT_BRANCH])
 
-    # 5. Verify live deployment
+    # 4. Verify live deployment
     if args.no_verify:
-        log("STEP 5/5  skipped (--no-verify)")
+        log("STEP 4/4  skipped (--no-verify)")
     else:
-        log("STEP 5/5  verifying live deployment (Pages rebuild ~1-3 min) ...")
+        log("STEP 4/4  verifying live deployment (Pages rebuild ~1-3 min) ...")
         verify_live(after)
 
     log(f"Done. Published data through {after} ({date.today().isoformat()}).")
