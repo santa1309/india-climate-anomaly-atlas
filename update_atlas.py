@@ -179,9 +179,13 @@ def main() -> None:
     run(["git", "add", "-A"])
     run(["git", "commit", "-m", commit_msg])
 
-    # 3. Push
+    # 3. Push (retry once after rebasing if the remote moved ahead)
     log("STEP 3/4  pushing to GitHub ...")
-    run(["git", "push", GIT_REMOTE, GIT_BRANCH])
+    push = run(["git", "push", GIT_REMOTE, GIT_BRANCH], check=False)
+    if push.returncode != 0:
+        log("push rejected -- syncing with remote (pull --rebase) and retrying ...")
+        run(["git", "pull", "--rebase", GIT_REMOTE, GIT_BRANCH])
+        run(["git", "push", GIT_REMOTE, GIT_BRANCH])
 
     # 4. Verify live deployment
     if args.no_verify:
