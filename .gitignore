@@ -18,3 +18,12 @@ data/temp_districts.geojson
 # Kept out of git so the weekly data push never hits GitHub's 100 MB limit.
 # Build it locally with: python update_atlas.py --build
 dashboard_standalone.html
+
+# Source rainfall archive for the 1971-2020 LPA normal (~6.4 GB daily NetCDF).
+# Local input only; must never be committed (exceeds GitHub's 100 MB limit).
+rainfall_historic/
+*.nc
+
+# Promo media in the SatSure dashboard (100s of MB; not served by Pages).
+*.mp4
+*.gif

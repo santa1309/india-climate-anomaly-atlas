@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SatSure · Climate Anomaly Atlas</title>
+
+  <!-- Fonts: Manrope (UI) + Roboto (charts), per SatSure design system -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ============================================================
+     TOP APP BAR  (logo · normal-period note · help)
+     ============================================================ -->
+<header class="appbar">
+  <div class="appbar-brand">
+    <span class="logo-chip">
+      <img class="satsure-logo" src="Satsure_Transparent_Bg_logo.png" alt="SatSure" />
+    </span>
+    <span class="brand-product">Climate Anomaly Atlas</span>
+    <span class="brand-domain-chip">Agri &amp; Climate</span>
+  </div>
+
+  <div class="appbar-actions">
+    <div class="latest-block">
+      <span class="latest-label">Latest week</span>
+      <span class="latest-value" id="metaCurrentWeek">—</span>
+    </div>
+    <button class="icon-btn" id="helpBtn" title="About this atlas" aria-label="About this atlas">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 015 .2c0 1.7-2.5 2-2.5 3.8"/><line x1="12" y1="17" x2="12" y2="17"/></svg>
+    </button>
+  </div>
+</header>
+
+<!-- ============================================================
+     WORKSPACE  (left drawer · map · right insights)
+     ============================================================ -->
+<div class="workspace">
+
+  <!-- ----------------- LEFT PERSISTENT DRAWER ----------------- -->
+  <aside class="drawer" aria-label="Filters and layers">
+
+    <section class="card filter-card">
+      <header class="card-head"><h2 class="card-title">Filters</h2></header>
+
+      <div class="filter-group">
+        <span class="filter-group-label">When</span>
+        <div class="seg" role="group" aria-label="Time granularity">
+          <button class="seg-btn" data-gran="week">Weekly</button>
+          <button class="seg-btn" data-gran="month">Monthly</button>
+          <button class="seg-btn" data-gran="season">Seasonal</button>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="yearSelect">Year</label>
+            <select id="yearSelect" class="select"></select>
+          </div>
+          <div class="field" id="fieldMonth">
+            <label for="monthSelect">Month</label>
+            <select id="monthSelect" class="select"></select>
+          </div>
+          <div class="field" id="fieldWeek">
+            <label for="weekSelect">Week</label>
+            <select id="weekSelect" class="select"></select>
+          </div>
+          <div class="field" id="fieldSeason" style="display:none">
+            <label for="seasonSelect">Season</label>
+            <select id="seasonSelect" class="select"></select>
+          </div>
+        </div>
+        <div class="period-pill" id="dateRangeDisplay">
+          <span class="period-label">Reporting period</span>
+          <span class="period-value" id="dateRangeValue">—</span>
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <span class="filter-group-label">Where</span>
+        <div class="seg" role="group" aria-label="Map level">
+          <button class="seg-btn" data-level="district">District</button>
+          <button class="seg-btn" data-level="state">State</button>
+        </div>
+        <div class="field">
+          <label for="stateSelect">State</label>
+          <select id="stateSelect" class="select"></select>
+        </div>
+        <div class="field" id="fieldDistrict">
+          <label for="districtSelect">District</label>
+          <select id="districtSelect" class="select"></select>
+        </div>
+      </div>
+    </section>
+
+    <!-- Layer panel: Section → Layer (Info · Visibility). No classes, no opacity. -->
+    <section class="card layer-panel">
+      <header class="card-head"><h2 class="card-title">Layers</h2></header>
+      <div class="layer-section">
+        <button class="layer-section-head" id="layerSectionToggle" aria-expanded="true">
+          <svg class="chev" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          <span>Climate variable</span>
+          <span class="layer-section-hint">choose one</span>
+        </button>
+        <div class="layer-section-body" id="layerList"><!-- injected --></div>
+      </div>
+    </section>
+  </aside>
+
+  <!-- --------------------- CENTER MAP ------------------------- -->
+  <section class="map-pane">
+    <div id="map"></div>
+    <div class="map-active-chip" id="activeLayerChip">Rainfall deviation</div>
+    <div class="map-floating-tip">
+      <span class="ft-dot" id="hintSurplusDot"></span><span id="hintSurplusLbl">Surplus</span>
+      <span class="ft-sep"></span>
+      <span class="ft-dot" id="hintDeficitDot"></span><span id="hintDeficitLbl">Deficit</span>
+      <span class="ft-sep"></span>
+      <span class="ft-muted">Hover for values · click to lock</span>
+    </div>
+  </section>
+
+  <!-- ------------------ RIGHT INSIGHTS PANEL ------------------ -->
+  <aside class="insights" aria-label="Insights">
+
+    <section class="card india-card" id="indiaCard">
+      <header class="card-head">
+        <h2 class="card-title">India · national</h2>
+        <span class="card-sub" id="indiaSub">—</span>
+      </header>
+      <div class="metric-grid">
+        <div class="metric">
+          <span class="metric-label">Actual</span>
+          <span class="metric-value" id="indiaActual">—</span>
+          <span class="metric-unit" id="indiaActualUnit">mm</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Normal</span>
+          <span class="metric-value" id="indiaNormal">—</span>
+          <span class="metric-unit" id="indiaNormalUnit">mm</span>
+        </div>
+        <div class="metric metric-emph">
+          <span class="metric-label" id="indiaMeasureLabel">Deviation</span>
+          <span class="metric-value" id="indiaMeasure">—</span>
+          <span class="metric-unit" id="indiaMeasureUnit">%</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Category</span>
+          <span class="metric-pill" id="indiaCategory">—</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="stat-row">
+      <div class="stat-card stat-surplus">
+        <span class="stat-glyph">▲</span>
+        <span class="stat-label" id="heroSurplusLabel">Surplus</span>
+        <span class="stat-value-row">
+          <span class="stat-value" id="heroSurplus">—</span>
+          <span class="stat-pct" id="heroSurplusPct">—</span>
+        </span>
+        <span class="stat-unit" id="heroSurplusUnit">excess districts</span>
+      </div>
+      <div class="stat-card stat-deficit">
+        <span class="stat-glyph">▼</span>
+        <span class="stat-label" id="heroDeficitLabel">Deficit</span>
+        <span class="stat-value-row">
+          <span class="stat-value" id="heroDeficit">—</span>
+          <span class="stat-pct" id="heroDeficitPct">—</span>
+        </span>
+        <span class="stat-unit" id="heroDeficitUnit">deficient + scanty + no-rain</span>
+      </div>
+    </section>
+
+    <section class="card dist-card">
+      <header class="card-head">
+        <h2 class="card-title">Distribution</h2>
+        <span class="card-sub" id="summaryCount">—</span>
+      </header>
+      <div class="dist-body">
+        <div class="pie-wrap"><canvas id="summaryPie"></canvas></div>
+        <ul class="dist-legend" id="summaryLegend"></ul>
+      </div>
+    </section>
+
+    <section class="card detail-card" id="detailCard">
+      <header class="card-head">
+        <h2 class="card-title" id="detailTitle">Select a district</h2>
+        <span class="card-sub" id="detailSub">Click the map or use the search</span>
+      </header>
+
+      <div class="detail-body" id="detailBody" hidden>
+        <div class="metric-grid">
+          <div class="metric">
+            <span class="metric-label">Actual</span>
+            <span class="metric-value" id="metActual">—</span>
+            <span class="metric-unit" id="metActualUnit">mm</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Normal</span>
+            <span class="metric-value" id="metNormal">—</span>
+            <span class="metric-unit" id="metNormalUnit">mm</span>
+          </div>
+          <div class="metric metric-emph">
+            <span class="metric-label" id="metMeasureLabel">Deviation</span>
+            <span class="metric-value" id="metDeviation">—</span>
+            <span class="metric-unit" id="metMeasureUnit">%</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Category</span>
+            <span class="metric-pill" id="metCategory">—</span>
+          </div>
+        </div>
+
+        <div class="chart-block">
+          <div class="chart-head">
+            <h3>Weekly trajectory <span class="chart-year" id="chartYear">—</span></h3>
+            <div class="chart-legend">
+              <span class="cl-item"><span class="cl-swatch cl-actual"></span>Actual</span>
+              <span class="cl-item"><span class="cl-swatch cl-normal"></span>Normal</span>
+            </div>
+          </div>
+          <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+        </div>
+      </div>
+    </section>
+  </aside>
+</div>
+
+<!-- ============================================================
+     BOTTOM ACTION BAR  (legend + primary CTA)
+     ============================================================ -->
+<footer class="action-bar">
+  <div class="legend" id="legendBar">
+    <span class="legend-title" id="legendTitle">Rainfall departure classes</span>
+  </div>
+  <div class="action-meta">
+    <span class="source-note"><span id="normalNote">Normal rainfall considered from 1971–2020 (IMD LPA)</span> · Source: IMD</span>
+    <button class="btn btn-text" id="resetViewBtn">Reset view</button>
+  </div>
+</footer>
+
+<!-- About dialog -->
+<div class="dialog-scrim" id="aboutScrim" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="aboutTitle">
+    <header class="dialog-head">
+      <h2 id="aboutTitle">About the Climate Anomaly Atlas</h2>
+      <button class="icon-btn" id="aboutClose" aria-label="Close">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+      </button>
+    </header>
+    <div class="dialog-body">
+      <p>An interactive atlas of <strong>rainfall and temperature anomalies</strong> for India, built from IMD daily gridded data.</p>
+      <ul>
+        <li><strong>Rainfall</strong> — deviation from the 1971–2020 IMD LPA normal (%).</li>
+        <li><strong>Max / Min temperature</strong> — anomaly from the 2016–2024 normal (°C).</li>
+        <li><strong>Granularity</strong> — weekly, monthly, or by crop season (Kharif Jun–Sep · Rabi Oct–Mar · Zaid Apr–May).</li>
+        <li><strong>Level</strong> — switch the map between districts and states; the national (India) summary is always on the right.</li>
+      </ul>
+      <p>Pick a granularity and period, switch the active layer, and click any district or state for its actual vs. normal values and a trajectory chart. All values are area-weighted zonal means of the daily grids.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Loading -->
+<div class="loading-screen" id="loadingScreen">
+  <div class="loader">
+    <div class="loader-ring"></div>
+    <div class="loader-text">Loading climate data…</div>
+  </div>
+</div>
+
+<script src="app.js?v=20260723"></script>
+</body>
+</html>
