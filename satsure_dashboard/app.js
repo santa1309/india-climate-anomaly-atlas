@@ -770,9 +770,11 @@
       minZoom: 4, maxZoom: 12, preferCanvas: true,
     }).setView([22.0, 80.5], 5);
 
+    // CARTO's anonymous basemap CDN now watermarks tiles "API KEY REQUIRED".
+    // Esri's light gray canvas is the keyless equivalent (no {s}/{r} support).
     L.tileLayer(
-      "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-      { attribution: "&copy; OpenStreetMap &copy; CARTO", subdomains: "abcd", maxZoom: 19 }
+      "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+      { attribution: "Tiles &copy; Esri", maxZoom: 16 }
     ).addTo(state.map);
 
     state.map.createPane("labels");
