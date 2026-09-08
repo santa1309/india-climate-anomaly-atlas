@@ -28,6 +28,7 @@ Useful flags:
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -126,6 +127,10 @@ def publish_source(after: str) -> None:
         log("source repo: no code/data changes to push")
         return
     log("pushing SOURCE code repo to GitHub ...")
+    if not repo_git_ok(SOURCE) and not repair_repo(SOURCE):
+        sys.exit("[publish_satsure] SOURCE git store is corrupt and could not be "
+                 "repaired. Deploy/Pages is already updated; fix the source repo "
+                 "by hand (it has uncommitted work, so do NOT re-clone it).")
     git_src(["add", "-A"])
     git_src(["commit", "-m", f"Pipeline + dashboard update: data through {after}"])
     push = git_src(["push", "origin", GIT_BRANCH], check=False)
@@ -135,11 +140,40 @@ def publish_source(after: str) -> None:
         git_src(["push", "origin", GIT_BRANCH])
 
 
-def deploy_git_ok() -> bool:
-    """True if the deploy repo's git store is readable (not NTFS-corrupted)."""
+# `git fsck` reports an unreadable loose object as:
+#   error: unable to unpack header of .git/objects/de/761ebe...
+BAD_OBJ_RE = re.compile(r"unable to unpack header of (\S+)")
+assert BAD_OBJ_RE.findall("error: unable to unpack header of .git/objects/de/761e") == [".git/objects/de/761e"]
+
+
+def repo_git_ok(repo: Path) -> bool:
+    """True if the repo's git store is fully readable (not NTFS-corrupted).
+    `git status` is not enough: it never touches the object store, so corrupt
+    objects sailed past this check and only blew up later at `git add`. fsck
+    actually reads them (~5s per repo)."""
     return subprocess.run(
-        ["git", "-C", str(DEPLOY), "status", "--porcelain"],
+        ["git", "-C", str(repo), "fsck", "--no-dangling"],
         capture_output=True, text=True).returncode == 0
+
+
+def repair_repo(repo: Path) -> bool:
+    """Heal a corrupt git store in place rather than re-cloning ~350 MB: a damaged
+    loose object shadows the good copy in the pack, so delete the ones fsck names
+    and re-download. Working tree and uncommitted changes are untouched.
+    True if the repo is clean afterwards."""
+    fsck = subprocess.run(["git", "-C", str(repo), "fsck", "--no-dangling"],
+                          capture_output=True, text=True)
+    bad = BAD_OBJ_RE.findall(fsck.stderr)
+    if not bad:
+        return False
+    log(f"{repo.name}: {len(bad)} corrupt git object(s) -- repairing in place ...")
+    for rel in bad:
+        obj = repo / rel
+        if obj.exists():
+            obj.chmod(0o600)  # git stores loose objects read-only; Windows enforces it
+            obj.unlink()
+    run(["git", "-C", str(repo), "fetch", "--refetch", GIT_REMOTE], check=False)
+    return repo_git_ok(repo)
 
 
 def ensure_deploy_repo() -> None:
@@ -150,7 +184,10 @@ def ensure_deploy_repo() -> None:
         log(f"deploy repo missing -- cloning fresh into {DEPLOY} ...")
         run(["git", "clone", DEPLOY_URL, str(DEPLOY)])
         return
-    if deploy_git_ok():
+    if repo_git_ok(DEPLOY):
+        return
+    if repair_repo(DEPLOY):
+        log("deploy repo repaired in place.")
         return
     aside = DEPLOY.with_name(f"{DEPLOY.name}_CORRUPT_{int(time.time())}")
     log(f"deploy repo git is unreadable (corrupt) -- moving aside to {aside.name} "
@@ -257,27 +294,29 @@ def main() -> None:
     log("STEP 2/5  syncing into deploy repo ...")
     sync_to_deploy()
 
-    if not git_has_changes():
-        log("No changes to publish -- already up to date. Nothing to deploy.")
-        return
-
     if args.no_push:
         log("STEP 3-5 skipped (--no-push). Deploy repo updated locally only.")
         return
 
-    # 3. Commit
-    commit_msg = f"Climate Change at a Glance: data through {after}"
-    log(f"STEP 3/5  committing: {commit_msg!r}")
-    git(["add", "-A"])
-    git(["commit", "-m", commit_msg])
+    # 3. Commit the deploy mirror (it can already be current when only code
+    #    changed -- the source repo below still needs pushing either way).
+    if git_has_changes():
+        commit_msg = f"Climate Change at a Glance: data through {after}"
+        log(f"STEP 3/5  committing: {commit_msg!r}")
+        git(["add", "-A"])
+        git(["commit", "-m", commit_msg])
 
-    # 4. Push deploy (Pages) repo, then the source code repo
-    log("STEP 4/5  pushing to GitHub ...")
-    push = git(["push", GIT_REMOTE, GIT_BRANCH], check=False)
-    if push.returncode != 0:
-        log("push rejected -- syncing (pull --rebase) and retrying ...")
-        git(["pull", "--rebase", GIT_REMOTE, GIT_BRANCH])
-        git(["push", GIT_REMOTE, GIT_BRANCH])
+        # 4. Push deploy (Pages) repo
+        log("STEP 4/5  pushing to GitHub ...")
+        push = git(["push", GIT_REMOTE, GIT_BRANCH], check=False)
+        if push.returncode != 0:
+            log("push rejected -- syncing (pull --rebase) and retrying ...")
+            git(["pull", "--rebase", GIT_REMOTE, GIT_BRANCH])
+            git(["push", GIT_REMOTE, GIT_BRANCH])
+    else:
+        log("STEP 3-4  deploy mirror already up to date -- nothing to publish there.")
+
+    # ... then the source code repo, which changes on its own (code edits)
     publish_source(after)
 
     # 5. Verify live deployment
