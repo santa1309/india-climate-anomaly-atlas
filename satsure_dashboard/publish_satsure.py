@@ -44,10 +44,10 @@ DEPLOY = Path(os.environ.get(
     "DEPLOY_DIR", WD.parent / "climate_change_at_glance"))  # sibling deploy repo
 SOURCE = WD                                            # pipeline/code repo (git)
 
-# The `spi` conda env is the only one with the full working stack
+# The `WEATHER_ANALYSIS` conda env is the one with the full working stack
 # (imdlib / geopandas / exactextract / rioxarray).
 SPI_PYTHON = Path(os.environ.get(
-    "SPI_PYTHON", r"C:/ProgramData/anaconda3/envs/spi/python.exe"))
+    "SPI_PYTHON", r"C:/Users/santosh/anaconda3/envs/WEATHER_ANALYSIS/python.exe"))
 
 GEN_SCRIPT   = WD / "weather_anomaly_dashboard_generation.py"
 BUILD_SCRIPT = HERE / "build_standalone.py"

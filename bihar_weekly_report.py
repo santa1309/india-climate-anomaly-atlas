@@ -1,5 +1,5 @@
 """
-Bihar district-wise weekly rainfall departure — maps + CSV, June-August 2026.
+Bihar district-wise weekly rainfall departure — maps + CSV, June-September 2026.
 
 Read-only consumer of the dashboard's existing period JSONs
 (data/rainfall/weeks/*.json). Writes one PNG map per completed week using the
@@ -22,9 +22,9 @@ import weather_anomaly_dashboard_generation as gen
 DATA = Path(r"D:\Satsure\satsure_codes1\dashboard\weather_dashboard\data")
 OUT = Path(r"D:\Satsure\satsure_codes1\dashboard\bihar_2026_report")
 STATE = "BIHAR"
-# Every week JSON the generator has published for these months — August is
-# partial (W1, W2 so far), so glob rather than assume 4 weeks per month.
-MONTHS = ("2026-06", "2026-07", "2026-08")
+# Every week JSON the generator has published for these months — the newest
+# month is partial (September: W1 so far), so glob rather than assume 4 weeks.
+MONTHS = ("2026-06", "2026-07", "2026-08", "2026-09")
 WEEKS = sorted(p.stem for p in (DATA / "rainfall" / "weeks").glob("*.json")
                if p.stem[:7] in MONTHS)
 

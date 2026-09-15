@@ -20,9 +20,9 @@ REM Force UTF-8 so the generator's special chars don't crash the console
 set PYTHONUTF8=1
 set PYTHONIOENCODING=utf-8
 
-REM The `spi` conda env has the full working stack (imdlib/geopandas/etc).
+REM The `WEATHER_ANALYSIS` conda env has the full working stack (imdlib/geopandas/etc).
 REM Override by setting SPI_PYTHON before running if your path differs.
-if "%SPI_PYTHON%"=="" set SPI_PYTHON=C:\ProgramData\anaconda3\envs\spi\python.exe
+if "%SPI_PYTHON%"=="" set SPI_PYTHON=C:\Users\santosh\anaconda3\envs\WEATHER_ANALYSIS\python.exe
 
 if not exist "%SPI_PYTHON%" (
     echo [update] ERROR: spi python not found at "%SPI_PYTHON%"
@@ -30,6 +30,11 @@ if not exist "%SPI_PYTHON%" (
     pause
     exit /b 1
 )
+
+REM Put the env's DLL dir on PATH (needed for _ssl etc.) - python.exe alone
+REM does not pick these up unless the env is `conda activate`-d first.
+for %%I in ("%SPI_PYTHON%") do set SPI_ENV_DIR=%%~dpI
+set PATH=%SPI_ENV_DIR%Library\bin;%SPI_ENV_DIR%Scripts;%SPI_ENV_DIR%;%PATH%
 
 "%SPI_PYTHON%" publish_satsure.py %*
 set RC=%ERRORLEVEL%
