@@ -1,6 +1,6 @@
 """
 Gangapur tehsil (Sawai Madhopur, Rajasthan) weekly rainfall departure -> CSV.
-June & July 2026 plus August W1-W2, 10 completed weeks. No maps.
+Every completed week from 1 June 2026 that has a published weekly JSON. No maps.
 
 Gangapur is a sub-district, so it is not in the atlas's period JSONs; every value
 here is computed from the source grids with the generator's own functions.
@@ -22,8 +22,6 @@ import weather_anomaly_dashboard_generation as gen
 DATA = Path(r"D:\Satsure\satsure_codes1\dashboard\weather_dashboard\data")
 SHP = Path(r"D:\Satsure\satsure_codes1\dashboard\Gangapur\Gangapur.shp")
 OUT = Path(r"D:\Satsure\satsure_codes1\dashboard\gangapur_2026_report")
-WEEKS = ([f"2026-{m:02d}-W{w}" for m in (6, 7) for w in (1, 2, 3, 4)]
-         + ["2026-08-W1", "2026-08-W2"])          # through 14 Aug
 CONTROL = "Sawai Madhopur"  # unique district name -> stored JSON record is safe to trust
 
 
@@ -45,8 +43,11 @@ def main() -> None:
     periods = {p["key"]: p for p in gen.iter_completed_week_periods(
         pd.Timestamp("2026-06-01").date(), pd.Timestamp.today().date())}
 
+    # Every completed week the atlas has published (the control needs its JSON).
+    weeks = [k for k in periods if (DATA / "rainfall" / "weeks" / f"{k}.json").exists()]
+
     rows = []
-    for key in WEEKS:
+    for key in weeks:
         p = periods[key]
         print(f"  {key} ...", flush=True)
         actual = gen._zonal_mean(gen.rainfall_actual(p["start"], p["end"]),
@@ -79,6 +80,7 @@ def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     out = OUT / "gangapur_rainfall_weekly_2026-06_2026-08.csv"
     pd.DataFrame(rows).to_csv(out, index=False)
+    pd.DataFrame(rows).to_excel(out.with_suffix(".xlsx"), index=False)
     print(f"{len(rows)} rows -> {out}")
 
 
